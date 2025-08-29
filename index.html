@@ -3,9 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <title>Rescue SOS App</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"> <!-- Mobile friendly -->
 
-    <!-- PWA Manifest -->
+    <!-- PWA: manifest + theme color -->
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#ff4c4c">
 
@@ -54,18 +54,17 @@
         <div id="lon">Longitude: --</div>
     </div>
 
-    <div id="link">
+    <div id="link" style="display: none;">
         <a href="#" id="mapsLink" target="_blank">📍 Open in Google Maps</a>
     </div>
 
     <script>
-        const CHANNEL_ID = '3049933';
-        const FIELD_LAT = 1;
-        const FIELD_LON = 2;
-        const UPDATE_INTERVAL = 10000;
-
-        let lastEntryId = null;
-        let initialized = false;
+        const CHANNEL_ID = '3049933';   // Your ThingSpeak Channel ID
+        const FIELD_LAT = 1;            // Latitude field number
+        const FIELD_LON = 2;            // Longitude field number
+        const UPDATE_INTERVAL = 10000;  // check every 10 seconds
+        let lastEntryId = null;         // to track only new updates
+        let initialized = false;        // to skip old data at first load
 
         function checkGPS() {
             fetch(`https://api.thingspeak.com/channels/${CHANNEL_ID}/feeds.json?results=1`)
@@ -76,35 +75,26 @@
                     const lat = parseFloat(feed[`field${FIELD_LAT}`]);
                     const lon = parseFloat(feed[`field${FIELD_LON}`]);
 
-                    if (!isNaN(lat) && !isNaN(lon)) {
-                        if (!initialized) {
-                            lastEntryId = entryId;
-                            initialized = true;
-                            return;
-                        }
+                    if (!initialized) {
+                        lastEntryId = entryId;
+                        initialized = true;
+                        return;
+                    }
 
-                        if (entryId !== lastEntryId) {
-                            lastEntryId = entryId;
+                    if (entryId !== lastEntryId && !isNaN(lat) && !isNaN(lon) && lat !== 0 && lon !== 0) {
+                        lastEntryId = entryId;
 
-                            document.getElementById("lat").innerText = "Latitude: " + lat.toFixed(6);
-                            document.getElementById("lon").innerText = "Longitude: " + lon.toFixed(6);
+                        document.getElementById("lat").innerText = "Latitude: " + lat.toFixed(6);
+                        document.getElementById("lon").innerText = "Longitude: " + lon.toFixed(6);
 
-                            const url = `https://www.google.com/maps?q=${lat},${lon}`;
-                            document.getElementById("mapsLink").href = url;
+                        const url = `https://www.google.com/maps?q=${lat},${lon}`;
+                        document.getElementById("mapsLink").href = url;
+                        document.getElementById("link").style.display = "block";
 
-                            document.getElementById("status").innerText = "🚨 SOS! I need help 🚨";
-                            document.getElementById("status").style.color = "yellow";
+                        document.getElementById("status").innerText = "🚨 SOS! I need help 🚨";
+                        document.getElementById("status").style.color = "yellow";
 
-                            // Browser Notification
-                            if (Notification.permission === "granted") {
-                                new Notification("🚨 SOS Alert 🚨", {
-                                    body: `Location updated!\nLat: ${lat.toFixed(6)}, Lon: ${lon.toFixed(6)}`,
-                                    icon: "icon-192.png"
-                                });
-                            } else {
-                                alert("🚨 SOS! I need help 🚨\nLocation updated.");
-                            }
-                        }
+                        alert("🚨 SOS! I need help 🚨\nLocation updated.");
                     }
                 })
                 .catch(err => console.error("Error fetching data:", err));
@@ -112,15 +102,11 @@
 
         setInterval(checkGPS, UPDATE_INTERVAL);
 
-        // Ask for notification permission
-        if ("Notification" in window && Notification.permission !== "granted") {
-            Notification.requestPermission();
-        }
-
-        // Register service worker
+        // ✅ Register service worker
         if ("serviceWorker" in navigator) {
             navigator.serviceWorker.register("service-worker.js")
-                .then(() => console.log("Service Worker Registered"));
+                .then(() => console.log("Service Worker Registered"))
+                .catch(err => console.error("SW registration failed:", err));
         }
     </script>
 </body>
