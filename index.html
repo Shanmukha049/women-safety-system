@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Rescue SOS App</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#ff4c4c">
+
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            text-align: center; 
+            margin: 0;
+            background: linear-gradient(to bottom, #ff4c4c, #000000); 
+            color: white;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+        h1 { font-size: 28px; margin-bottom: 10px; }
+        #status { margin: 15px; font-size: 22px; font-weight: bold; }
+        .row {
+            display: flex;
+            justify-content: space-between;
+            margin: 20px;
+            font-size: 20px;
+            background: rgba(0,0,0,0.4);
+            padding: 15px;
+            border-radius: 10px;
+        }
+        .row div { flex: 1; }
+        #link { margin: 25px 0; font-size: 18px; }
+        a {
+            text-decoration: none; color: white;
+            background: #007BFF; padding: 15px 25px;
+            border-radius: 12px; font-size: 18px;
+        }
+        a:hover { background: #0056b3; }
+        .sos-image { width: 80px; margin: 0 auto 15px auto; }
+    </style>
+</head>
+<body>
+    <img src="https://cdn-icons-png.flaticon.com/512/564/564619.png" class="sos-image" alt="SOS Icon">
+    <h1>Emergency Rescue SOS</h1>
+
+    <div id="status" style="color: lightgreen;">✅ Safe - no update yet</div>
+
+    <div class="row">
+        <div id="lat">Latitude: --</div>
+        <div id="lon">Longitude: --</div>
+    </div>
+
+    <div id="link">
+        <a href="#" id="mapsLink" target="_blank">📍 Open in Google Maps</a>
+    </div>
+
+    <script>
+        const CHANNEL_ID = '3049933';
+        const FIELD_LAT = 1;
+        const FIELD_LON = 2;
+        const UPDATE_INTERVAL = 10000;
+
+        let lastEntryId = null;
+        let initialized = false;
+
+        function checkGPS() {
+            fetch(`https://api.thingspeak.com/channels/${CHANNEL_ID}/feeds.json?results=1`)
+                .then(response => response.json())
+                .then(data => {
+                    const feed = data.feeds[0];
+                    const entryId = feed.entry_id;
+                    const lat = parseFloat(feed[`field${FIELD_LAT}`]);
+                    const lon = parseFloat(feed[`field${FIELD_LON}`]);
+
+                    if (!isNaN(lat) && !isNaN(lon)) {
+                        if (!initialized) {
+                            lastEntryId = entryId;
+                            initialized = true;
+                            return;
+                        }
+
+                        if (entryId !== lastEntryId) {
+                            lastEntryId = entryId;
+
+                            document.getElementById("lat").innerText = "Latitude: " + lat.toFixed(6);
+                            document.getElementById("lon").innerText = "Longitude: " + lon.toFixed(6);
+
+                            const url = `https://www.google.com/maps?q=${lat},${lon}`;
+                            document.getElementById("mapsLink").href = url;
+
+                            document.getElementById("status").innerText = "🚨 SOS! I need help 🚨";
+                            document.getElementById("status").style.color = "yellow";
+
+                            // Browser Notification
+                            if (Notification.permission === "granted") {
+                                new Notification("🚨 SOS Alert 🚨", {
+                                    body: `Location updated!\nLat: ${lat.toFixed(6)}, Lon: ${lon.toFixed(6)}`,
+                                    icon: "icon-192.png"
+                                });
+                            } else {
+                                alert("🚨 SOS! I need help 🚨\nLocation updated.");
+                            }
+                        }
+                    }
+                })
+                .catch(err => console.error("Error fetching data:", err));
+        }
+
+        setInterval(checkGPS, UPDATE_INTERVAL);
+
+        // Ask for notification permission
+        if ("Notification" in window && Notification.permission !== "granted") {
+            Notification.requestPermission();
+        }
+
+        // Register service worker
+        if ("serviceWorker" in navigator) {
+            navigator.serviceWorker.register("service-worker.js")
+                .then(() => console.log("Service Worker Registered"));
+        }
+    </script>
+</body>
+</html>
